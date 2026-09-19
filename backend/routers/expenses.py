@@ -15,7 +15,7 @@ DatabaseSession = Annotated[Session, Depends(get_db)]
 
 @router.get("", response_model=list[ExpenseResponse])
 def get_expenses(database_session: DatabaseSession):
-    statement = select(Expense).order_by(Expense.date.desc())
+    statement = select(Expense).order_by(Expense.id.asc())
     expenses = database_session.scalars(statement).all()
     return expenses
 

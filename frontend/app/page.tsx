@@ -1,11 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AddExpenseModal } from "./components/add-expense-modal";
 import { AnalyticsPanels } from "./components/analytics-panels";
 import {
   categories,
-  initialExpenses,
   monthlyBudget,
   type Expense,
 } from "./components/expense-data";
@@ -15,28 +14,74 @@ import { MobileHeader, Sidebar } from "./components/sidebar";
 import { SummaryCards } from "./components/summary-cards";
 
 export default function Home() {
-  const [expenses, setExpenses] = useState<Expense[]>(initialExpenses);
+  const [expenses, setExpenses] = useState<Expense[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
+
+  const API_URL = process.env.NEXT_PUBLIC_API_URL;
+
+  useEffect(() => {
+    const fetchExpenses = async () => {
+      try {
+        const response = await fetch(`${API_URL}/api/expenses`);
+        if (!response.ok) {
+          throw new Error("Failed to fetch expenses");
+        }
+        const data = await response.json();
+        const expenses = data.map((expense: Expense) => ({
+          ...expense,
+          amount: Number(expense.amount),
+        }));
+        setExpenses(expenses);
+      } catch (error) {
+        if (error instanceof Error) {
+          console.error("Unable to fetch :", error.message);
+        }
+      }
+    };
+    fetchExpenses();
+  }, []);
 
   const totalSpent = useMemo(
     () => expenses.reduce((sum, expense) => sum + expense.amount, 0),
     [expenses],
   );
-  const categoryTotals = useMemo(
-    () =>
-      expenses.reduce<Record<string, number>>((totals, expense) => {
-        totals[expense.category] =
-          (totals[expense.category] ?? 0) + expense.amount;
-        return totals;
-      }, {}),
-    [expenses],
-  );
+  const categoryTotals = useMemo(() => {
+    const totals: Record<string, number> = {};
+
+    for (const expense of expenses) {
+      const category = expense.category;
+      const existingTotal = totals[category] ?? 0;
+
+      totals[category] = existingTotal + expense.amount;
+    }
+
+    return totals;
+  }, [expenses]);
   const chartData = categories
     .map((category) => ({ category, amount: categoryTotals[category] ?? 0 }))
     .filter((item) => item.amount > 0);
 
-  function addExpense(expense: Expense) {
-    setExpenses((current) => [expense, ...current]);
+  async function addExpense(expense: Expense) {
+    const response = await fetch(`${API_URL}/api/expenses`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(expense),
+    });
+    if (!response.ok) {
+      throw new Error("Unable to add expense");
+    }
+
+    const data = await response.json();
+
+    const newExpense = {
+      ...data,
+      amount: Number(data.amount),
+    };
+    console.log(typeof newExpense.amount);
+
+    setExpenses((currentExpenses) => [...currentExpenses, newExpense]);
     setIsModalOpen(false);
   }
 

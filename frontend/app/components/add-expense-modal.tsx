@@ -4,10 +4,15 @@ import { Icon } from "./dashboard-icon";
 
 type AddExpenseModalProps = {
   onClose: () => void;
-  onAdd: (expense: Expense) => Promise<void>;
+  onAdd: (expense: Omit<Expense, "id">) => Promise<void>;
+  expense?: Expense;
 };
 
-export function AddExpenseModal({ onClose, onAdd }: AddExpenseModalProps) {
+export function AddExpenseModal({
+  onClose,
+  onAdd,
+  expense,
+}: AddExpenseModalProps) {
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = event.currentTarget;
@@ -49,10 +54,12 @@ export function AddExpenseModal({ onClose, onAdd }: AddExpenseModalProps) {
               id="expense-modal-title"
               className="text-lg font-semibold text-[#142032]"
             >
-              Add expense
+              {expense ? "Edit expense" : "Add expense"}
             </h2>
             <p className="mt-1 text-sm text-slate-500">
-              Record a new transaction.
+              {expense
+                ? "Update transaction details."
+                : "Record a new transaction."}
             </p>
           </div>
           <button
@@ -74,6 +81,7 @@ export function AddExpenseModal({ onClose, onAdd }: AddExpenseModalProps) {
             </span>
             <input
               name="title"
+              defaultValue={expense?.title ?? ""}
               type="text"
               required
               minLength={2}
@@ -92,6 +100,7 @@ export function AddExpenseModal({ onClose, onAdd }: AddExpenseModalProps) {
               </span>
               <input
                 name="amount"
+                defaultValue={expense?.amount ?? ""}
                 type="number"
                 required
                 min="1"
@@ -108,7 +117,7 @@ export function AddExpenseModal({ onClose, onAdd }: AddExpenseModalProps) {
             <select
               name="category"
               required
-              defaultValue=""
+              defaultValue={expense?.category ?? ""}
               className="form-control"
             >
               <option value="" disabled>
@@ -129,7 +138,7 @@ export function AddExpenseModal({ onClose, onAdd }: AddExpenseModalProps) {
               name="date"
               type="date"
               required
-              defaultValue="2026-09-07"
+              defaultValue={expense?.date ?? "2026-09-07"}
               className="form-control"
             />
           </label>
@@ -145,7 +154,7 @@ export function AddExpenseModal({ onClose, onAdd }: AddExpenseModalProps) {
               type="submit"
               className="h-11 rounded-lg bg-[#18845e] px-5 text-sm font-semibold text-white transition hover:bg-[#126e4e] focus:outline-none focus:ring-4 focus:ring-emerald-200"
             >
-              Add expense
+              {expense ? "Save changes" : "Add expense"}
             </button>
           </div>
         </form>

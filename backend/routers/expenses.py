@@ -1,7 +1,7 @@
 from typing import Annotated
 
 from database import get_db
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from models.expenses import Expense
 from schemas.expenses import ExpenseCreate, ExpenseResponse, ExpenseUpdate
 from sqlalchemy import select
@@ -43,11 +43,32 @@ def create_expense(
 
 
 @router.patch("/{expense_id}")
-def update_expense(expense_id: int, expense: ExpenseUpdate):
+def update_expense(
+    expense_id: int, expense: ExpenseUpdate, database_session: DatabaseSession
+):
+    existing_expense = database_session.get(Expense, expense_id)
+
+    if existing_expense is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Expense Not Found"
+        )
+
     expense_data = expense.model_dump(exclude_unset=True)
-    return {"message": f"Expense {expense_id} updated", "data": expense_data}
+    for field, value in expense_data.items():
+        setattr(existing_expense, field, value)
+    database_session.commit()
+    database_session.refresh(existing_expense)
+    return existing_expense
 
 
-@router.delete("/{expense_id}")
-def delete_expense(expense_id: int):
-    return {"message": f"Expense {expense_id} Deleted"}
+@router.delete("/{expense_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_expense(expense_id: int, database_session: DatabaseSession):
+    exisitng_expense = database_session.get(Expense, expense_id)
+    if exisitng_expense is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Expense Not Found"
+        )
+
+    database_session.delete(exisitng_expense)
+    database_session.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

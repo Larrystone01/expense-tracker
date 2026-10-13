@@ -16,6 +16,7 @@ import { SummaryCards } from "./components/summary-cards";
 export default function Home() {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
 
   const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
@@ -41,6 +42,25 @@ export default function Home() {
     fetchExpenses();
   }, []);
 
+  const handleDelete = async (id: number) => {
+    try {
+      if (!id) {
+        throw new Error("No valid expense Id");
+      }
+      const response = await fetch(`${API_URL}/api/expenses/${id}`, {
+        method: "DELETE",
+      });
+      if (!response.ok) {
+        throw new Error("Failed to delete expense");
+      }
+      setExpenses((current) => current.filter((expense) => expense.id !== id));
+    } catch (err) {
+      if (err instanceof Error) {
+        console.error("Unable to delete expense:", err.message);
+      }
+    }
+  };
+
   const totalSpent = useMemo(
     () => expenses.reduce((sum, expense) => sum + expense.amount, 0),
     [expenses],
@@ -61,16 +81,22 @@ export default function Home() {
     .map((category) => ({ category, amount: categoryTotals[category] ?? 0 }))
     .filter((item) => item.amount > 0);
 
-  async function addExpense(expense: Expense) {
-    const response = await fetch(`${API_URL}/api/expenses`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
+  async function addExpense(expense: Omit<Expense, "id">, id?: number) {
+    const isEditing = id !== undefined;
+    const response = await fetch(
+      isEditing ? `${API_URL}/api/expenses/${id}` : `${API_URL}/api/expenses`,
+      {
+        method: isEditing ? "PATCH" : "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(expense),
       },
-      body: JSON.stringify(expense),
-    });
+    );
     if (!response.ok) {
-      throw new Error("Unable to add expense");
+      throw new Error(
+        isEditing ? "Unable to update expense" : "Unable to add expense",
+      );
     }
 
     const data = await response.json();
@@ -81,7 +107,11 @@ export default function Home() {
     };
     console.log(typeof newExpense.amount);
 
-    setExpenses((currentExpenses) => [...currentExpenses, newExpense]);
+    setExpenses((current) =>
+      isEditing
+        ? current.map((item) => (item.id === id ? newExpense : item))
+        : [...current, newExpense],
+    );
     setIsModalOpen(false);
   }
 
@@ -120,7 +150,15 @@ export default function Home() {
             categoryTotals={categoryTotals}
             totalSpent={totalSpent}
           />
-          <ExpensesTable expenses={expenses} />
+          <ExpensesTable
+            expenses={expenses}
+            onEdit={setEditingExpense}
+            onDelete={(expense) => {
+              if (window.confirm(`Delete "${expense.title}"?`)) {
+                handleDelete(expense.id);
+              }
+            }}
+          />
         </main>
       </div>
 
@@ -128,6 +166,21 @@ export default function Home() {
         <AddExpenseModal
           onClose={() => setIsModalOpen(false)}
           onAdd={addExpense}
+        />
+      )}
+      {editingExpense && (
+        <AddExpenseModal
+          expense={editingExpense}
+          onClose={() => setEditingExpense(null)}
+          onAdd={async (changes) => {
+            await addExpense(changes, editingExpense.id);
+            setExpenses((current) =>
+              current.map((item) =>
+                item.id === editingExpense.id ? { ...item, ...changes } : item,
+              ),
+            );
+            setEditingExpense(null);
+          }}
         />
       )}
     </div>
